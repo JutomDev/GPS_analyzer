@@ -2,6 +2,7 @@
 data_priv/
 czyste_dane_gps.csv
 *.png
+generator_gps.py
 
 # Python
 __pycache__/
