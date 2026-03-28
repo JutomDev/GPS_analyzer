@@ -1,0 +1,19 @@
+# Dane prywatne i wyniki
+data_priv/
+czyste_dane_gps.csv
+*.png
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
