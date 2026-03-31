@@ -1,5 +1,4 @@
 import csv
-import math
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -15,27 +14,24 @@ import matplotlib.pyplot as plt
 
 class BaseGPSAnalyzer:
     """
-    Bazowa klasa (matka) dla analizatorów GPS.
-    Zawiera wspólną logikę obliczeń i wizualizacji, niezależną od formatu źródłowego.
+    Bazowa klasa dla analizatorów GPS
+    Zawiera wspólną logikę obliczeń i wizualizacji, niezależną od formatu źródłowego
     """
 
     def __init__(self, file_path: str):
         """
-        Inicjalizuje bazowy analizator GPS.
-
-        Args:
-            file_path (str): Ścieżka do pliku z danymi.
+        Inicjalizuje bazowy analizator GPS
         """
         self.file_path: str = file_path
         self.data: List[Dict[str, Any]] = []
 
     def calculate_kinematics_and_smooth(self, max_speed_kmh: float = 150.0) -> None:
         """
-        Oblicza dystans i prędkość między punktami używając Numpy.
-        Wykrywa anomalie (spoofing) i wygładza trajektorię filtrem Savitzky'ego-Golaya.
+        Oblicza dystans i prędkość między punktami
+        Wykrywa anomalie spoofing i wygładza trajektorię filtrem Savitzkyego-Golaya
         """
         if len(self.data) < 2:
-            print("Zbyt mało danych do obliczeń kinematycznych.")
+            print("Zbyt mało danych do obliczeń kinematycznych")
             return
 
         lats = np.array([d['GPS_Lat'] for d in self.data])
@@ -47,6 +43,8 @@ class BaseGPSAnalyzer:
 
         last_valid_idx = 0
         for i in range(1, len(self.data)):
+
+            # jeśli czas przeskoczy przez północ różnica byłaby ujemna
             dt = times[i] - times[last_valid_idx]
             if dt < 0: dt += 86400.0
             if dt == 0: dt = 1.0
@@ -57,6 +55,7 @@ class BaseGPSAnalyzer:
             dlat = lat2 - lat1
             dlon = lon2 - lon1
             
+            # oblicza odległość między dwoma punktami na kuli - 6371000.0 to średni promień Ziemi w metrach
             a = np.sin(dlat / 2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0)**2
             c = 2.0 * np.arctan2(np.sqrt(a), np.sqrt(1.0 - a))
             dist_meters = 6371000.0 * c
@@ -78,6 +77,7 @@ class BaseGPSAnalyzer:
             window_length = min(15, len(valid_indices))
             if window_length % 2 == 0: window_length -= 1
             
+            # Filtr Savitzkyego - wygładza punkty
             smooth_lats = savgol_filter(lats[valid_indices], window_length=window_length, polyorder=3)
             smooth_lons = savgol_filter(lons[valid_indices], window_length=window_length, polyorder=3)
             
@@ -89,14 +89,16 @@ class BaseGPSAnalyzer:
                 self.data[idx]['Smooth_Lat'] = self.data[idx]['GPS_Lat']
                 self.data[idx]['Smooth_Lon'] = self.data[idx]['GPS_Lon']
 
-        print(f"Zakończono obliczenia. Wykryto {sum(anomalies)} anomalii (spoofing).")
+        print(f"Zakończono obliczenia. Wykryto {sum(anomalies)} anomalii spoofing") 
 
     def detect_stops(self, eps_meters: float = 20.0, min_samples: int = 10) -> None:
-        """Wykrywa postoje używając klasteryzacji DBSCAN."""
+        """ Wykrywa postoje używając klasteryzacji DBSCAN"""
         valid_indices = [i for i, d in enumerate(self.data) if not d['is_anomaly'] and 'Smooth_Lat' in d]
         if not valid_indices: return
 
         coords = np.radians(np.array([[self.data[i]['Smooth_Lat'], self.data[i]['Smooth_Lon']] for i in valid_indices]))
+
+        # algorytm klasteryzacji oparty na gęstości, który grupuje punkty znajdujące się blisko siebie
         dbscan = DBSCAN(eps=eps_meters/6371000.0, min_samples=min_samples, algorithm='ball_tree', metric='haversine')
         labels = dbscan.fit_predict(coords)
 
@@ -105,10 +107,10 @@ class BaseGPSAnalyzer:
             if label != -1:
                 self.data[idx]['is_stop'] = True
                 stops_count += 1
-        print(f"Zakończono detekcję postojów. Oznaczono {stops_count} punktów jako postój.")
+        print(f"Zakończono detekcję postojów. Oznaczono {stops_count} punktów jako postój")
 
     def export_clean_csv(self, output_filename: str) -> None:
-        """Eksportuje wyczyszczone dane do pliku CSV."""
+        """ Eksportuje odfiltrowane dane do pliku CSV"""
         clean_data = [d for d in self.data if not d.get('is_anomaly', False)]
         if not clean_data: return
 
@@ -120,7 +122,7 @@ class BaseGPSAnalyzer:
         print(f"Pomyślnie wyeksportowano {len(clean_data)} punktów do: {output_filename}")
 
     def plot_results(self) -> None:
-        """Generuje wykresy i zapisuje do pliku PNG."""
+        """ Generuje wykresy i zapisuje do pliku PNG """
         traj_lons, traj_lats = [], []
         stop_lons, stop_lats = [], []
         anom_lons, anom_lats = [], []
@@ -156,10 +158,10 @@ class BaseGPSAnalyzer:
 
 
 class CSVAnalyzer(BaseGPSAnalyzer):
-    """Specjalistyczny analizator dla plików w formacie CSV."""
+    """ Analizator dla plików w formacie CSV """
 
     def _parse_time(self, time_str: str) -> float:
-        """Zamienia tekstowy czas na sekundy (bezpieczne dla Windows)."""
+        """ Zamienia tekstowy czas na sekundy"""
         time_str = time_str.strip()
         if not time_str: return 0.0
         try:
@@ -174,12 +176,12 @@ class CSVAnalyzer(BaseGPSAnalyzer):
         return 0.0
 
     def _safe_float(self, val: Any) -> Optional[float]:
-        """Bezpieczna konwersja na float."""
+        """ Konwersja na float """
         try: return float(val)
         except (ValueError, TypeError): return None
 
     def load_and_clean_data(self) -> None:
-        """Wczytuje i czyści dane z pliku CSV."""
+        """ Wczytuje i czyści dane z pliku csv """
         try:
             with open(self.file_path, 'r', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f, delimiter=';')
@@ -196,8 +198,10 @@ class CSVAnalyzer(BaseGPSAnalyzer):
                 row['GPS_Lat'] is not None and row['GPS_Lon'] is not None and 
                 row['GPS_Lat'] != 0.0 and row['GPS_Lon'] != 0.0, parsed_data)
 
-            self.data = [ {**row, 'is_stop': False, 'is_anomaly': False} for row in filtered_data]
-            print(f"Wczytano dane CSV. Poprawnych punktów: {len(self.data)}")
+            final_data = map(lambda row: {**row, 'is_stop': False, 'is_anomaly': False}, filtered_data)
+            self.data = list(final_data)
+
+            print(f"Wczytano dane CSV - Poprawnych punktów: {len(self.data)}")
         except FileNotFoundError:
             print(f"Błąd: Nie znaleziono pliku {self.file_path}")
             raise

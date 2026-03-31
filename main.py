@@ -2,7 +2,7 @@ from gps_analyzer import CSVAnalyzer
 
 def main():
     """
-    Główna funkcja uruchomieniowa aplikacji.
+    Główna funkcja uruchomieniowa aplikacji
     """
     # Ścieżka do pliku CSV
     csv_file_path = 'dane/gps_test.csv' 
@@ -16,7 +16,7 @@ def main():
     try:
         analyzer.load_and_clean_data()
     except FileNotFoundError:
-        print(f"BŁĄD: Nie znaleziono pliku {csv_file_path}. Utwórz plik testowy i spróbuj ponownie.")
+        print(f"BŁĄD: Nie znaleziono pliku {csv_file_path}, utwórz plik testowy i spróbuj ponownie")
         return
 
     # 3. Obliczenia kinematyczne i wygładzanie
